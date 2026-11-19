@@ -6,7 +6,7 @@ The BApp Store requires an extension to bundle its dependencies so that installa
 and cannot collide with another extension's versions. `grpc-web-coder-all.jar` therefore contains
 the following third-party libraries. Both licences are compatible with GPL-3.0.
 
-## protobuf-java
+## protobuf-javalite
 
 - Version: 4.29.3
 - Copyright: Copyright 2008 Google Inc. All rights reserved.
@@ -14,7 +14,7 @@ the following third-party libraries. Both licences are compatible with GPL-3.0.
 - Home: https://github.com/protocolbuffers/protobuf
 
 Used for wire-level protobuf reads and writes (`CodedInputStream`, `CodedOutputStream`). The
-schema-less type inference layered on top is part of this project, not of protobuf-java.
+schema-less type inference layered on top is part of this project, not of protobuf-javalite.
 
 ```
 Redistribution and use in source and binary forms, with or without
@@ -65,4 +65,4 @@ The full Apache 2.0 licence text is available at https://www.apache.org/licenses
 Version 1.x vendored [blackboxprotobuf](https://github.com/nccgroup/blackboxprotobuf) and
 [jsbeautifier](https://github.com/beautifier/js-beautify) as Python sources. Version 2.0.0 is a Java
 rewrite and no longer includes either: the schema-less protobuf layer is implemented directly
-against protobuf-java, and the JavaScript analyzer no longer needs a pretty-printer.
+against protobuf-javalite, and the JavaScript analyzer no longer needs a pretty-printer.

@@ -15,7 +15,9 @@ dependencies {
 
     // Bundled: the BApp Store requires an extension to ship its own dependencies so that
     // installation is one click and cannot collide with another extension's versions.
-    implementation("com.google.protobuf:protobuf-java:4.29.3")
+    // The lite runtime: only CodedInputStream/CodedOutputStream/WireFormat are used, and it is a
+    // fraction of the size of full protobuf-java (no descriptors, reflection or JsonFormat).
+    implementation("com.google.protobuf:protobuf-javalite:4.29.3")
     implementation("com.google.code.gson:gson:2.11.0")
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
@@ -51,7 +53,7 @@ tasks.test {
 }
 
 /**
- * Builds the single jar loaded into Burp, with protobuf-java and gson inside it.
+ * Builds the single jar loaded into Burp, with protobuf-javalite and gson inside it.
  *
  * Burp gives every extension its own classloader, so the bundled libraries cannot clash with
  * another extension's copies and do not need relocating.
@@ -84,6 +86,11 @@ val fatJar = tasks.register<Jar>("fatJar") {
         // merged, and a stale signature will make the JVM reject the jar outright.
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/MANIFEST.MF")
         exclude("module-info.class", "META-INF/versions/*/module-info.class")
+        // Nothing reads these at runtime: well-known-type .proto sources, Maven and ProGuard
+        // metadata, and gson's compile-time-only Error Prone annotations.
+        exclude("google/protobuf/*.proto", "core/*.proto.bin")
+        exclude("META-INF/maven/**", "META-INF/proguard/**")
+        exclude("com/google/errorprone/**")
     }
 }
 
