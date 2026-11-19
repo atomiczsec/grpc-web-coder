@@ -24,12 +24,19 @@ public final class GrpcWebResponseEditor implements ExtensionProvidedHttpRespons
     private final ExtensionSettings settings;
     private final GrpcWebEditor editor;
 
+    private HttpRequestResponse requestResponse;
     private HttpResponse response;
 
     public GrpcWebResponseEditor(MontoyaApi api, ExtensionSettings settings,
                                  EditorCreationContext context) {
         this.settings = settings;
         this.editor = new GrpcWebEditor(api, settings, context.editorMode() != EditorMode.READ_ONLY);
+        // Same limitation as the request tab: RawEditor in a custom pane needs an explicit
+        // Send-to… menu. Repeater / Intruder use the paired request; Comparer / Decoder use the
+        // current (possibly re-encoded) response.
+        this.editor.installResponseContextMenu(
+                () -> this.requestResponse == null ? null : this.requestResponse.request(),
+                this::getResponse);
     }
 
     @Override
@@ -45,6 +52,7 @@ public final class GrpcWebResponseEditor implements ExtensionProvidedHttpRespons
 
     @Override
     public void setRequestResponse(HttpRequestResponse requestResponse) {
+        this.requestResponse = requestResponse;
         response = requestResponse == null || !requestResponse.hasResponse()
                 ? null
                 : requestResponse.response();

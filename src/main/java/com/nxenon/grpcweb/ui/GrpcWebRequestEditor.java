@@ -29,6 +29,9 @@ public final class GrpcWebRequestEditor implements ExtensionProvidedHttpRequestE
     public GrpcWebRequestEditor(MontoyaApi api, ExtensionSettings settings,
                                 EditorCreationContext context) {
         this.editor = new GrpcWebEditor(api, settings, context.editorMode() != EditorMode.READ_ONLY);
+        // RawEditor alone does not get Burp's full message context menu in a custom tab; this
+        // installs the supported Send-to… equivalent on the decoded panes.
+        this.editor.installRequestContextMenu(this::getRequest);
     }
 
     @Override
