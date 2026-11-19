@@ -17,9 +17,9 @@ import java.util.List;
  * Decodes protobuf wire data without a {@code .proto} schema, inferring a field type for each field
  * as it goes.
  *
- * <p>Wire-level reading is delegated to {@link CodedInputStream} from protobuf-java, which is
+ * <p>Wire-level reading is delegated to {@link CodedInputStream} from protobuf-javalite, which is
  * hardened against malformed input (varint overflow, truncated fields, runaway recursion). This
- * class supplies only the part protobuf-java cannot: guessing what each field <em>means</em>.
+ * class supplies only the part protobuf-javalite cannot: guessing what each field <em>means</em>.
  *
  * <h2>Inference rules</h2>
  * <ul>
@@ -42,7 +42,7 @@ public final class ProtobufDecoder {
 
     /**
      * Maximum nesting depth for the speculative "is this length-delimited field a message?" probe.
-     * Deliberately lower than protobuf-java's own 100-deep limit: each level here is speculative
+     * Deliberately lower than protobuf's own 100-deep limit: each level here is speculative
      * work over attacker-controlled bytes, and real gRPC-Web messages do not nest anywhere near
      * this deep.
      */

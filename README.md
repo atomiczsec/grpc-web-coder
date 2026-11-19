@@ -49,7 +49,7 @@ Homebrew's OpenJDK is keg-only and is not linked by default, so point `JAVA_HOME
 export JAVA_HOME=$(brew --prefix openjdk@21)
 ```
 
-The extension jar lands at `build/libs/grpc-web-coder-all.jar`, with protobuf-java and gson bundled
+The extension jar lands at `build/libs/grpc-web-coder-all.jar`, with protobuf-javalite and gson bundled
 inside it.
 
 ## Install in Burp
@@ -420,7 +420,7 @@ names and exact types live only in the `.proto`. So:
 
 - [montoya-api](https://github.com/PortSwigger/burp-extensions-montoya-api) — compile-time only,
   provided by Burp.
-- [protobuf-java](https://github.com/protocolbuffers/protobuf) — `CodedInputStream` and
+- [protobuf-javalite](https://github.com/protocolbuffers/protobuf) — `CodedInputStream` and
   `CodedOutputStream` for wire-level reads and writes, hardened against malformed input. The type
   inference on top is this project's own.
 - [gson](https://github.com/google/gson) — JSON for the editor tabs.
