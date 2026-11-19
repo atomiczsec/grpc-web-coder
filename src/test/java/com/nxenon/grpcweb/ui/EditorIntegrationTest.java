@@ -5,6 +5,7 @@ import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
 import burp.api.montoya.ui.editor.extension.EditorMode;
+import com.nxenon.grpcweb.protobuf.Hex;
 import com.nxenon.grpcweb.ui.BurpTestHarness.RecordingEditor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -258,6 +260,26 @@ class EditorIntegrationTest {
 
     @Nested
     class TypeDefinitionOverride {
+
+        @Test
+        void perFrameDefinitionsAreAdoptedAndEditsReachTheBody() throws Exception {
+            byte[] bytes = Hex.decode(
+                    "00000000040a02484900000000070a0568656c6c6f");
+            String body = new String(bytes, StandardCharsets.ISO_8859_1);
+            GrpcWebRequestEditor editor = requestEditor();
+            editor.setRequestResponse(BurpTestHarness.requestWith(PROTO, body));
+            assertTrue(payloadEditor().text().contains("hello"), payloadEditor().text());
+
+            typeDefinitionEditor().type(typeDefinitionEditor().text());
+            editor.setRequestResponse(BurpTestHarness.requestWith(PROTO, body));
+            assertTrue(payloadEditor().text().contains("hello"), payloadEditor().text());
+            payloadEditor().type(payloadEditor().text().replace("hello", "world"));
+
+            byte[] expected = Hex.decode(
+                    "00000000040a02484900000000070a05776f726c64");
+            assertArrayEquals(
+                    expected, editor.getRequest().body().getBytes());
+        }
 
         @Test
         @DisplayName("the type definition tab starts read-only")

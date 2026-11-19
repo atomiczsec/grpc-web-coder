@@ -1,5 +1,7 @@
 package com.nxenon.grpcweb.codec;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonParser;
 import com.nxenon.grpcweb.protobuf.FieldType;
 import com.nxenon.grpcweb.protobuf.Hex;
 import com.nxenon.grpcweb.protobuf.ProtobufException;
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +24,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * editor, over bodies shaped like real gRPC-Web traffic.
  */
 class GrpcWebDocumentTest {
+
+    @Test
+    void independentFrameGuessesRoundTrip() throws Exception {
+        byte[] binary = Hex.decode("00000000040a02484900000000070a0568656c6c6f");
+        for (GrpcWebFormat format : GrpcWebFormat.values()) {
+            byte[] body = format == GrpcWebFormat.TEXT ? Base64Chunks.encode(binary) : binary;
+            GrpcWebDocument document = GrpcWebDocument.decode(body, format);
+            JsonArray frames = JsonParser.parseString(
+                    document.toPayloadJson()).getAsJsonObject().getAsJsonArray("frames");
+            assertEquals(73, frames.get(0).getAsJsonObject().getAsJsonObject("message")
+                    .getAsJsonObject("1").get("9").getAsInt());
+            assertEquals("hello", frames.get(1).getAsJsonObject()
+                    .getAsJsonObject("message").get("1").getAsString());
+            assertArrayEquals(body, GrpcWebDocument.encode(document.toPayloadJson(),
+                    document.toTypeDefinitionJson(), format));
+            assertEquals(document.toPayloadJson(), GrpcWebDocument.decodeWithDefinitions(
+                    body, format, document.toTypeDefinitionJson()).toPayloadJson());
+        }
+    }
 
     /** Unary request: one data frame holding {@code { 1: "amin", 2: 1337 }}. */
     private static final String UNARY_TEXT_BODY = "AAAAAAkKBGFtaW4QuQo=";
@@ -149,27 +171,33 @@ class GrpcWebDocumentTest {
         }
 
         @Test
-        @DisplayName("one type definition is shared by every data frame")
-        void oneTypeDefinitionCoversAllFrames() throws Exception {
+        @DisplayName("each data frame has a type definition")
+        void eachFrameHasATypeDefinition() throws Exception {
             GrpcWebDocument document =
                     GrpcWebDocument.decode(ascii(STREAMING_TEXT_BODY), GrpcWebFormat.TEXT);
-            // Both frames carry field 1 as a string, so the definition has exactly one entry.
-            assertEquals(1, document.typeDefinition().size());
-            assertEquals(FieldType.STRING, document.typeDefinition().get(1).type());
+            List<TypeDefinition> definitions =
+                    GrpcWebDocument.parseTypeDefinitions(document.toTypeDefinitionJson());
+            assertEquals(3, definitions.size());
+            assertEquals(FieldType.STRING, definitions.get(0).get(1).type());
+            assertEquals(FieldType.STRING, definitions.get(1).get(1).type());
+            assertTrue(definitions.get(2).isEmpty());
         }
 
         @Test
-        @DisplayName("a field that appears only in a later frame still reaches the definition")
-        void laterFrameFieldsAccumulate() throws Exception {
+        @DisplayName("later frame fields do not leak into earlier definitions")
+        void laterFrameFieldsStayIndependent() throws Exception {
             // Frame one has field 1 only; frame two adds field 2.
             byte[] frames = Hex.decode(
                     "00000000050a036f6e65"      // frame 1: { 1: "one" }
                     + "0000000002107b");        // frame 2: { 2: 123 }
             GrpcWebDocument document = GrpcWebDocument.decode(frames, GrpcWebFormat.PROTO);
 
-            assertEquals(2, document.typeDefinition().size());
-            assertEquals(FieldType.STRING, document.typeDefinition().get(1).type());
-            assertEquals(FieldType.INT, document.typeDefinition().get(2).type());
+            List<TypeDefinition> definitions =
+                    GrpcWebDocument.parseTypeDefinitions(document.toTypeDefinitionJson());
+            assertEquals(1, definitions.get(0).size());
+            assertEquals(FieldType.STRING, definitions.get(0).get(1).type());
+            assertEquals(1, definitions.get(1).size());
+            assertEquals(FieldType.INT, definitions.get(1).get(2).type());
         }
 
         @Test
@@ -398,6 +426,23 @@ class GrpcWebDocumentTest {
             GrpcWebDocument document = GrpcWebDocument.decode(new byte[0], GrpcWebFormat.PROTO);
             assertEquals(0, document.frameCount());
             assertFalse(document.isSimple());
+            assertArrayEquals(new byte[0], GrpcWebDocument.encode(document.toPayloadJson(),
+                    document.toTypeDefinitionJson(), GrpcWebFormat.PROTO));
+        }
+
+        @Test
+        void missingFrameDefinitionIsReported() {
+            ProtobufException error = assertThrows(ProtobufException.class,
+                    () -> GrpcWebDocument.encode(
+                            "{\"frames\":[{\"message\":{}},{\"message\":{}},{\"message\":{}}]}",
+                            "{\"frames\":[{},{}]}", GrpcWebFormat.PROTO));
+            assertTrue(error.getMessage().contains("Missing type definition for frame 2"));
+        }
+
+        @Test
+        void invalidFrameDefinitionIsReported() {
+            assertThrows(ProtobufException.class,
+                    () -> GrpcWebDocument.parseTypeDefinitions("{\"frames\":[null]}"));
         }
     }
 }
