@@ -1,0 +1,67 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Also validates the checksum of gradle/wrapper/gradle-wrapper.jar.
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Test and build the extension jar
+        run: ./gradlew clean build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: grpc-web-coder-all
+          path: build/libs/grpc-web-coder-all.jar
+          if-no-files-found: error
+
+  # Publishes the jar as a GitHub release named after the version in build.gradle.kts, once per
+  # version: bump `version` to cut the next release.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: grpc-web-coder-all
+
+      - name: Create the release if this version has none yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+          if [ -z "$version" ]; then
+            echo "::error::No version found in build.gradle.kts"
+            exit 1
+          fi
+          tag="v$version"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Release $tag already exists; bump the version in build.gradle.kts to publish a new one."
+            exit 0
+          fi
+          gh release create "$tag" grpc-web-coder-all.jar \
+            --title "gRPC-Web Coder $version" \
+            --target "$GITHUB_SHA" \
+            --generate-notes
