@@ -69,15 +69,17 @@ public final class GrpcWebDocument {
         private final MessageValue message;
         private final String trailerText;
         private final byte[] raw;
-        private TypeDefinition typeDefinition;
+        private final TypeDefinition typeDefinition;
 
-        private Frame(int flags, MessageValue message, String trailerText, byte[] raw) {
+        private Frame(int flags, MessageValue message, String trailerText, byte[] raw,
+                      TypeDefinition typeDefinition) {
             this.flags = flags;
             this.trailer = (flags & GrpcFrame.FLAG_TRAILER) != 0;
             this.compressed = (flags & GrpcFrame.FLAG_COMPRESSED) != 0;
             this.message = message;
             this.trailerText = trailerText;
             this.raw = raw;
+            this.typeDefinition = typeDefinition;
         }
 
         /** Bits with no defined meaning, which have to be carried through untouched. */
@@ -85,16 +87,16 @@ public final class GrpcWebDocument {
             return flags & ~(GrpcFrame.FLAG_COMPRESSED | GrpcFrame.FLAG_TRAILER);
         }
 
-        static Frame message(MessageValue message, int flags) {
-            return new Frame(flags, message, null, null);
+        static Frame message(MessageValue message, int flags, TypeDefinition typeDefinition) {
+            return new Frame(flags, message, null, null, typeDefinition);
         }
 
         static Frame trailers(String text, int flags) {
-            return new Frame(flags, null, text, null);
+            return new Frame(flags, null, text, null, null);
         }
 
         static Frame raw(byte[] bytes, int flags) {
-            return new Frame(flags, null, null, bytes);
+            return new Frame(flags, null, null, bytes, null);
         }
     }
 
@@ -142,8 +144,7 @@ public final class GrpcWebDocument {
         List<Frame> decoded = new ArrayList<>(wireFrames.size());
 
         for (GrpcFrame wireFrame : wireFrames) {
-            TypeDefinition typeDefinition = JsonCodec.jsonToTypeDefinition(
-                    JsonCodec.typeDefinitionToJson(definitionAt(definitions, decoded.size())));
+            TypeDefinition typeDefinition = definitionAt(definitions, decoded.size()).copy();
             byte[] payload = GrpcWebCodec.decompress(wireFrame);
             if (wireFrame.isTrailer()) {
                 String text = ProtobufDecoder.tryDecodeUtf8(payload);
@@ -155,9 +156,7 @@ public final class GrpcWebDocument {
                 continue;
             }
             MessageValue message = ProtobufDecoder.decodeWith(payload, typeDefinition);
-            Frame frame = Frame.message(message, wireFrame.flags());
-            frame.typeDefinition = typeDefinition;
-            decoded.add(frame);
+            decoded.add(Frame.message(message, wireFrame.flags(), typeDefinition));
         }
         TypeDefinition first = decoded.stream().filter(frame -> frame.message != null)
                 .map(frame -> frame.typeDefinition).findFirst().orElseGet(TypeDefinition::new);
