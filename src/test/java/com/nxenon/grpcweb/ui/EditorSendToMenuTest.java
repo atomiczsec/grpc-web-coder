@@ -14,10 +14,14 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTextArea;
 import java.awt.Component;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -106,6 +110,50 @@ class EditorSendToMenuTest {
             EditorSendToMenu menu = EditorSendToMenu.forRequest(api, () -> request, () -> null);
             find(menu.buildMenu(), "Send to Intruder").doClick();
             verify(api.intruder()).sendToIntruder(request);
+        }
+    }
+
+    @Nested
+    class Copying {
+
+        private final Clipboard clipboard = new Clipboard("test");
+
+        private EditorSendToMenu menu(HttpRequest current, ByteArray selection) {
+            return new EditorSendToMenu(
+                    api, () -> current, () -> null, () -> selection, () -> clipboard);
+        }
+
+        private String clipboardText() throws Exception {
+            return (String) clipboard.getData(DataFlavor.stringFlavor);
+        }
+
+        @Test
+        @DisplayName("Copy request keeps every byte of a binary gRPC-Web body")
+        void copyRequestKeepsBinaryBody() throws Exception {
+            ByteArrayOutputStream raw = new ByteArrayOutputStream();
+            raw.writeBytes(("POST /pkg.Svc/Call HTTP/1.1\r\n"
+                    + "Content-Type: application/grpc-web+proto\r\n"
+                    + "Content-Length: 10\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            // One data frame holding field 1 = bytes {ff fe 80}, none of which is valid UTF-8.
+            raw.writeBytes(new byte[] {0x00, 0x00, 0x00, 0x00, 0x05,
+                    0x0a, 0x03, (byte) 0xff, (byte) 0xfe, (byte) 0x80});
+            byte[] original = raw.toByteArray();
+            HttpRequest binary = mock(HttpRequest.class);
+            when(binary.toByteArray()).thenReturn(new BurpTestHarness.TestByteArray(original));
+
+            find(menu(binary, null).buildMenu(), "Copy request").doClick();
+
+            assertArrayEquals(original, clipboardText().getBytes(StandardCharsets.ISO_8859_1));
+        }
+
+        @Test
+        @DisplayName("Copy keeps non-ASCII text selected in the decoded payload")
+        void copySelectionKeepsDecodedText() throws Exception {
+            ByteArray selection = bytes("{ \"1\": \"héllo ✓\" }");
+
+            find(menu(request, selection).buildMenu(), "Copy").doClick();
+
+            assertEquals("{ \"1\": \"héllo ✓\" }", clipboardText());
         }
     }
 
