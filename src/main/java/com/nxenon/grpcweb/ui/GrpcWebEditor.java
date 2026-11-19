@@ -3,6 +3,8 @@ package com.nxenon.grpcweb.ui;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ByteArray;
 import burp.api.montoya.http.message.HttpMessage;
+import burp.api.montoya.http.message.requests.HttpRequest;
+import burp.api.montoya.http.message.responses.HttpResponse;
 import burp.api.montoya.ui.Selection;
 import burp.api.montoya.ui.editor.EditorOptions;
 import burp.api.montoya.ui.editor.RawEditor;
@@ -22,6 +24,7 @@ import java.awt.Component;
 import java.awt.FlowLayout;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * The decode/edit surface shared by the request and response editor tabs.
@@ -30,6 +33,11 @@ import java.util.Optional;
  * <em>Type Definition</em> holds the field types. The type definition starts as the decoder's guess
  * and is read-only until the user chooses to edit it; once edited it is applied to every subsequent
  * decode, so a field they retyped from {@code bytes} to {@code string} stays that way.
+ *
+ * <p>Both panes use Burp's {@code createRawEditor()} for search, theme and editability. That does
+ * not attach Burp's full HTTP message context menu in a custom tab, so
+ * {@link #installRequestContextMenu} / {@link #installResponseContextMenu} add the supported
+ * Send-to… equivalent on the editor text surfaces.
  */
 final class GrpcWebEditor {
 
@@ -87,6 +95,36 @@ final class GrpcWebEditor {
         resetTypeDefinitionButton.addActionListener(event -> resetTypeDefinition());
         applyTypeDefinitionButton.setEnabled(false);
         resetTypeDefinitionButton.setEnabled(false);
+    }
+
+    /**
+     * Installs a Send-to… context menu on both editor panes for a request tab.
+     *
+     * <p>{@code requestSupplier} should return the request that would be forwarded right now
+     * (including any re-encoded edits), matching what Burp's Raw tab would send.
+     */
+    void installRequestContextMenu(Supplier<HttpRequest> requestSupplier) {
+        EditorSendToMenu menu = EditorSendToMenu.forRequest(
+                api, requestSupplier, () -> EditorSendToMenu.selectedBytes(payloadEditor));
+        menu.installOn(payloadEditor);
+        menu.installOn(typeDefinitionEditor);
+    }
+
+    /**
+     * Installs a Send-to… context menu on both editor panes for a response tab.
+     *
+     * <p>Repeater / Intruder / Organizer use the paired request; Comparer / Decoder prefer the
+     * current selection, then the (possibly re-encoded) response bytes.
+     */
+    void installResponseContextMenu(
+            Supplier<HttpRequest> requestSupplier, Supplier<HttpResponse> responseSupplier) {
+        EditorSendToMenu menu = new EditorSendToMenu(
+                api,
+                requestSupplier,
+                responseSupplier,
+                () -> EditorSendToMenu.selectedBytes(payloadEditor));
+        menu.installOn(payloadEditor);
+        menu.installOn(typeDefinitionEditor);
     }
 
     private EditorOptions[] payloadEditorOptions() {
