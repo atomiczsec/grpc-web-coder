@@ -20,6 +20,19 @@ public final class TypeDefinition {
 
     private final LinkedHashMap<Integer, FieldDefinition> fields = new LinkedHashMap<>();
 
+    /** Copies this definition and its nested definitions, preserving field order. */
+    public TypeDefinition copy() {
+        TypeDefinition copy = new TypeDefinition();
+        for (FieldDefinition field : fields.values()) {
+            FieldDefinition copiedField = copy.define(field.number, field.type);
+            copiedField.name = field.name;
+            copiedField.alternativeTypes = field.alternativeTypes;
+            copiedField.messageTypeDefinition = field.messageTypeDefinition == null
+                    ? null : field.messageTypeDefinition.copy();
+        }
+        return copy;
+    }
+
     /** A single field's interpretation. */
     public static final class FieldDefinition {
         private final int number;

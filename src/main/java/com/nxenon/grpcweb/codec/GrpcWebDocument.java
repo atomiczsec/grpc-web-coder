@@ -19,14 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A whole gRPC-Web body, decoded: every frame's protobuf message as editable JSON, plus the one
- * type definition shared by all of them.
- *
- * <h2>Why one type definition</h2>
- * Every data frame in a gRPC-Web stream carries the same protobuf message type — a server-streaming
- * response repeats one response message. The frames are therefore decoded through a single
- * accumulating {@link TypeDefinition}, so a field that only appears in the third frame still ends up
- * in the definition.
+ * A whole gRPC-Web body, decoded: every frame's protobuf message as editable JSON, with its own
+ * type definition. Inferred types are guesses, even when frames share a protobuf schema.
  *
  * <h2>Document shapes</h2>
  * A body with exactly one data frame and no trailer renders as the message object on its own, which
@@ -75,14 +69,17 @@ public final class GrpcWebDocument {
         private final MessageValue message;
         private final String trailerText;
         private final byte[] raw;
+        private final TypeDefinition typeDefinition;
 
-        private Frame(int flags, MessageValue message, String trailerText, byte[] raw) {
+        private Frame(int flags, MessageValue message, String trailerText, byte[] raw,
+                      TypeDefinition typeDefinition) {
             this.flags = flags;
             this.trailer = (flags & GrpcFrame.FLAG_TRAILER) != 0;
             this.compressed = (flags & GrpcFrame.FLAG_COMPRESSED) != 0;
             this.message = message;
             this.trailerText = trailerText;
             this.raw = raw;
+            this.typeDefinition = typeDefinition;
         }
 
         /** Bits with no defined meaning, which have to be carried through untouched. */
@@ -90,16 +87,16 @@ public final class GrpcWebDocument {
             return flags & ~(GrpcFrame.FLAG_COMPRESSED | GrpcFrame.FLAG_TRAILER);
         }
 
-        static Frame message(MessageValue message, int flags) {
-            return new Frame(flags, message, null, null);
+        static Frame message(MessageValue message, int flags, TypeDefinition typeDefinition) {
+            return new Frame(flags, message, null, null, typeDefinition);
         }
 
         static Frame trailers(String text, int flags) {
-            return new Frame(flags, null, text, null);
+            return new Frame(flags, null, text, null, null);
         }
 
         static Frame raw(byte[] bytes, int flags) {
-            return new Frame(flags, null, null, bytes);
+            return new Frame(flags, null, null, bytes, null);
         }
     }
 
@@ -119,7 +116,7 @@ public final class GrpcWebDocument {
      */
     public static GrpcWebDocument decode(byte[] body, GrpcWebFormat format)
             throws GrpcWebException, ProtobufException {
-        return decode(body, format, new TypeDefinition());
+        return decodeDefinitions(body, format, List.of(new TypeDefinition()));
     }
 
     /**
@@ -129,11 +126,25 @@ public final class GrpcWebDocument {
     public static GrpcWebDocument decode(byte[] body, GrpcWebFormat format,
                                          TypeDefinition typeDefinition)
             throws GrpcWebException, ProtobufException {
+        return decodeDefinitions(body, format, List.of(typeDefinition));
+    }
+
+    /** Decodes with either a shared user definition or definitions indexed by wire frame. */
+    public static GrpcWebDocument decodeWithDefinitions(byte[] body, GrpcWebFormat format,
+                                                       String json)
+            throws GrpcWebException, ProtobufException {
+        return decodeDefinitions(body, format, parseTypeDefinitions(json));
+    }
+
+    private static GrpcWebDocument decodeDefinitions(byte[] body, GrpcWebFormat format,
+                                                      List<TypeDefinition> definitions)
+            throws GrpcWebException, ProtobufException {
 
         List<GrpcFrame> wireFrames = GrpcWebCodec.readBody(body, format);
         List<Frame> decoded = new ArrayList<>(wireFrames.size());
 
         for (GrpcFrame wireFrame : wireFrames) {
+            TypeDefinition typeDefinition = definitionAt(definitions, decoded.size()).copy();
             byte[] payload = GrpcWebCodec.decompress(wireFrame);
             if (wireFrame.isTrailer()) {
                 String text = ProtobufDecoder.tryDecodeUtf8(payload);
@@ -145,9 +156,11 @@ public final class GrpcWebDocument {
                 continue;
             }
             MessageValue message = ProtobufDecoder.decodeWith(payload, typeDefinition);
-            decoded.add(Frame.message(message, wireFrame.flags()));
+            decoded.add(Frame.message(message, wireFrame.flags(), typeDefinition));
         }
-        return new GrpcWebDocument(decoded, typeDefinition, format);
+        TypeDefinition first = decoded.stream().filter(frame -> frame.message != null)
+                .map(frame -> frame.typeDefinition).findFirst().orElseGet(TypeDefinition::new);
+        return new GrpcWebDocument(decoded, first, format);
     }
 
     // ------------------------------------------------------------------ view
@@ -157,6 +170,7 @@ public final class GrpcWebDocument {
         return frames.size();
     }
 
+    /** The first data frame's definition, or an empty definition when there is no data. */
     public TypeDefinition typeDefinition() {
         return typeDefinition;
     }
@@ -199,7 +213,7 @@ public final class GrpcWebDocument {
                 object.addProperty(KEY_TRAILERS, frame.trailerText);
             } else {
                 object.add(KEY_MESSAGE,
-                        JsonParser.parseString(JsonCodec.valueToJson(frame.message, typeDefinition)));
+                        JsonParser.parseString(JsonCodec.valueToJson(frame.message, frame.typeDefinition)));
             }
             array.add(object);
         }
@@ -210,7 +224,43 @@ public final class GrpcWebDocument {
 
     /** The inferred or supplied type definition, as the JSON shown in the Type Definition tab. */
     public String toTypeDefinitionJson() {
-        return JsonCodec.typeDefinitionToJson(typeDefinition);
+        if (frames.size() == 1) {
+            return JsonCodec.typeDefinitionToJson(typeDefinition);
+        }
+        JsonArray array = new JsonArray();
+        for (Frame frame : frames) {
+            array.add(JsonParser.parseString(JsonCodec.typeDefinitionToJson(
+                    frame.typeDefinition == null ? new TypeDefinition() : frame.typeDefinition)));
+        }
+        JsonObject root = new JsonObject();
+        root.add(KEY_FRAMES, array);
+        return PRETTY.toJson(root);
+    }
+
+    /** Parses the Type Definition tab; frame-list entries follow wire-frame order. */
+    public static List<TypeDefinition> parseTypeDefinitions(String json) throws ProtobufException {
+        JsonElement root = parse(json);
+        if (root.isJsonObject() && isFrameList(root.getAsJsonObject())) {
+            List<TypeDefinition> definitions = new ArrayList<>();
+            for (JsonElement entry : root.getAsJsonObject().getAsJsonArray(KEY_FRAMES)) {
+                definitions.add(JsonCodec.jsonToTypeDefinition(entry.toString()));
+            }
+            return definitions;
+        }
+        return List.of(JsonCodec.jsonToTypeDefinition(json));
+    }
+
+    private static TypeDefinition definitionAt(List<TypeDefinition> definitions, int index) {
+        if (index < definitions.size()) {
+            return definitions.get(index);
+        }
+        // Trailer entries have empty definitions; reuse the last data definition for new frames.
+        for (int i = definitions.size() - 1; i >= 0; i--) {
+            if (!definitions.get(i).isEmpty()) {
+                return definitions.get(i).copy();
+            }
+        }
+        return new TypeDefinition();
     }
 
     // ---------------------------------------------------------------- encode
@@ -227,7 +277,7 @@ public final class GrpcWebDocument {
     public static byte[] encode(String payloadJson, String typeDefinitionJson, GrpcWebFormat format)
             throws ProtobufException, GrpcWebException {
 
-        TypeDefinition typeDefinition = JsonCodec.jsonToTypeDefinition(typeDefinitionJson);
+        List<TypeDefinition> definitions = parseTypeDefinitions(typeDefinitionJson);
         JsonElement root = parse(payloadJson);
         if (!root.isJsonObject()) {
             throw new ProtobufException("The payload must be a JSON object");
@@ -240,9 +290,11 @@ public final class GrpcWebDocument {
                 if (!element.isJsonObject()) {
                     throw new ProtobufException("Each entry in \"frames\" must be a JSON object");
                 }
-                wireFrames.add(encodeFrame(element.getAsJsonObject(), typeDefinition));
+                wireFrames.add(encodeFrame(element.getAsJsonObject(),
+                        definitionAt(definitions, wireFrames.size())));
             }
         } else {
+            TypeDefinition typeDefinition = definitionAt(definitions, 0);
             MessageValue value = JsonCodec.jsonToValue(payloadJson, typeDefinition);
             wireFrames.add(GrpcFrame.data(ProtobufEncoder.encode(value, typeDefinition)));
         }

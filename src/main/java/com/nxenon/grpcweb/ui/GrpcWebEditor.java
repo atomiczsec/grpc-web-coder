@@ -10,8 +10,6 @@ import burp.api.montoya.ui.editor.EditorOptions;
 import burp.api.montoya.ui.editor.RawEditor;
 import com.nxenon.grpcweb.codec.GrpcWebDocument;
 import com.nxenon.grpcweb.codec.GrpcWebFormat;
-import com.nxenon.grpcweb.protobuf.JsonCodec;
-import com.nxenon.grpcweb.protobuf.TypeDefinition;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -54,7 +52,7 @@ final class GrpcWebEditor {
     private final JButton resetTypeDefinitionButton = new JButton("Reset to detected");
 
     /** Set once the user applies an edited type definition; until then the guess is refreshed. */
-    private TypeDefinition userTypeDefinition;
+    private String userTypeDefinition;
 
     /**
      * The body currently on display, kept so that applying an edited type definition can redecode
@@ -224,7 +222,7 @@ final class GrpcWebEditor {
         try {
             GrpcWebDocument document = userTypeDefinition == null
                     ? GrpcWebDocument.decode(body.getBytes(), format)
-                    : GrpcWebDocument.decode(body.getBytes(), format, userTypeDefinition);
+                    : GrpcWebDocument.decodeWithDefinitions(body.getBytes(), format, userTypeDefinition);
 
             payloadEditor.setContents(text(document.toPayloadJson()));
             if (userTypeDefinition == null) {
@@ -292,7 +290,8 @@ final class GrpcWebEditor {
             return;
         }
         try {
-            userTypeDefinition = JsonCodec.jsonToTypeDefinition(json);
+            GrpcWebDocument.parseTypeDefinitions(json);
+            userTypeDefinition = json;
         } catch (Exception e) {
             setStatus("Type definition not applied: " + e.getMessage());
             return;
@@ -324,7 +323,8 @@ final class GrpcWebEditor {
             return;
         }
         try {
-            userTypeDefinition = JsonCodec.jsonToTypeDefinition(json);
+            GrpcWebDocument.parseTypeDefinitions(json);
+            userTypeDefinition = json;
         } catch (Exception e) {
             setStatus("Type definition not applied: " + e.getMessage());
         }
