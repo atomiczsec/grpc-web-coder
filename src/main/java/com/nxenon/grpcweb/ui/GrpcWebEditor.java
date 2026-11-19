@@ -14,7 +14,6 @@ import com.nxenon.grpcweb.protobuf.JsonCodec;
 import com.nxenon.grpcweb.protobuf.TypeDefinition;
 
 import javax.swing.BorderFactory;
-import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -137,22 +136,29 @@ final class GrpcWebEditor {
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(typeDefinitionEditor.uiComponent(), BorderLayout.CENTER);
 
+        // Buttons and the hint used to share one FlowLayout row, which clipped the help text as
+        // soon as the editor was narrower than the sentence.
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
         buttons.add(editTypeDefinitionButton);
         buttons.add(applyTypeDefinitionButton);
         buttons.add(resetTypeDefinitionButton);
-        buttons.add(new JLabel(
+
+        JLabel hint = new JLabel(
                 "Change a field's \"type\" to reinterpret it. Any \"alt_types\" list shows the"
-                        + " other readings of the same bytes."));
-        panel.add(buttons, BorderLayout.SOUTH);
+                        + " other readings of the same bytes.");
+        hint.setBorder(BorderFactory.createEmptyBorder(0, 6, 4, 6));
+
+        JPanel south = new JPanel(new BorderLayout());
+        south.add(buttons, BorderLayout.NORTH);
+        south.add(hint, BorderLayout.SOUTH);
+        panel.add(south, BorderLayout.SOUTH);
         return panel;
     }
 
     private Component buildStatusBar() {
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
-        bar.add(statusLabel, BorderLayout.WEST);
-        bar.add(Box.createHorizontalGlue(), BorderLayout.CENTER);
+        bar.add(statusLabel, BorderLayout.CENTER);
         return bar;
     }
 
@@ -300,8 +306,9 @@ final class GrpcWebEditor {
         typeDefinitionEditor.setEditable(false);
         applyTypeDefinitionButton.setEnabled(false);
         resetTypeDefinitionButton.setEnabled(false);
+        // setBody refreshes the tabs and writes the decode status; overwriting that with a separate
+        // "reset" line used to hide whether the body actually decoded after the reset.
         setBody(currentBody, currentFormat);
-        setStatus("Type definition reset to the detected one.");
     }
 
     /**
