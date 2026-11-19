@@ -431,12 +431,20 @@ class GrpcWebDocumentTest {
         }
 
         @Test
-        void missingFrameDefinitionIsReported() {
-            ProtobufException error = assertThrows(ProtobufException.class,
-                    () -> GrpcWebDocument.encode(
-                            "{\"frames\":[{\"message\":{}},{\"message\":{}},{\"message\":{}}]}",
-                            "{\"frames\":[{},{}]}", GrpcWebFormat.PROTO));
-            assertTrue(error.getMessage().contains("Missing type definition for frame 2"));
+        void extraFrameUsesLastDataDefinition() throws Exception {
+            byte[] encoded = GrpcWebDocument.encode(
+                    "{\"frames\":[{\"message\":{\"1\":1}},{\"message\":{\"1\":true}},"
+                            + "{\"trailers\":\"\"},{\"message\":{\"1\":false}}]}",
+                    "{\"frames\":[{\"1\":\"int\"},{\"1\":\"bool\"},{}]}",
+                    GrpcWebFormat.PROTO);
+            assertArrayEquals(Hex.decode("0000000002080100000000020801800000000000000000020800"),
+                    encoded);
+        }
+
+        @Test
+        void extraEmptyFramesNeedNoDefinition() throws Exception {
+            assertArrayEquals(Hex.decode("0000000000"), GrpcWebDocument.encode(
+                    "{\"frames\":[{\"message\":{}}]}", "{\"frames\":[]}", GrpcWebFormat.PROTO));
         }
 
         @Test

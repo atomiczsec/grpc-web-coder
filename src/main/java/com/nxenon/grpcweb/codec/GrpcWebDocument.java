@@ -250,15 +250,17 @@ public final class GrpcWebDocument {
         return List.of(JsonCodec.jsonToTypeDefinition(json));
     }
 
-    private static TypeDefinition definitionAt(List<TypeDefinition> definitions, int index)
-            throws ProtobufException {
-        if (definitions.size() == 1) {
-            return definitions.get(0);
+    private static TypeDefinition definitionAt(List<TypeDefinition> definitions, int index) {
+        if (index < definitions.size()) {
+            return definitions.get(index);
         }
-        if (index >= definitions.size()) {
-            throw new ProtobufException("Missing type definition for frame " + index);
+        // Trailer entries have empty definitions; reuse the last data definition for new frames.
+        for (int i = definitions.size() - 1; i >= 0; i--) {
+            if (!definitions.get(i).isEmpty()) {
+                return definitions.get(i).copy();
+            }
         }
-        return definitions.get(index);
+        return new TypeDefinition();
     }
 
     // ---------------------------------------------------------------- encode

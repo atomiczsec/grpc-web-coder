@@ -262,6 +262,31 @@ class EditorIntegrationTest {
     class TypeDefinitionOverride {
 
         @Test
+        void appliedTwoFrameDefinitionsAllowALongerBody() throws Exception {
+            String twoFrames = new String(Hex.decode("0000000002080100000000020801"),
+                    StandardCharsets.ISO_8859_1);
+            GrpcWebRequestEditor editor = requestEditor();
+            editor.setRequestResponse(BurpTestHarness.requestWith(PROTO, twoFrames));
+            typeDefinitionEditor().type("{\"frames\":[{\"1\":\"int\"},{\"1\":\"bool\"}]}");
+            editor.setRequestResponse(BurpTestHarness.requestWith(PROTO, twoFrames));
+
+            String threeFrames = twoFrames + new String(Hex.decode("00000000020800"),
+                    StandardCharsets.ISO_8859_1);
+            editor.setRequestResponse(BurpTestHarness.requestWith(PROTO, threeFrames));
+
+            com.google.gson.JsonArray frames = com.google.gson.JsonParser.parseString(
+                    payloadEditor().text()).getAsJsonObject().getAsJsonArray("frames");
+            assertEquals(3, frames.size());
+            assertTrue(frames.get(1).getAsJsonObject().getAsJsonObject("message")
+                    .get("1").getAsBoolean());
+            assertFalse(frames.get(2).getAsJsonObject().getAsJsonObject("message")
+                    .get("1").getAsBoolean());
+            payloadEditor().type(payloadEditor().text());
+            assertArrayEquals(threeFrames.getBytes(StandardCharsets.ISO_8859_1),
+                    editor.getRequest().body().getBytes());
+        }
+
+        @Test
         void perFrameDefinitionsAreAdoptedAndEditsReachTheBody() throws Exception {
             byte[] bytes = Hex.decode(
                     "00000000040a02484900000000070a0568656c6c6f");
