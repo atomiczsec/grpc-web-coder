@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -398,6 +399,64 @@ class GrpcWebDocumentTest {
             GrpcWebDocument document = GrpcWebDocument.decode(new byte[0], GrpcWebFormat.PROTO);
             assertEquals(0, document.frameCount());
             assertFalse(document.isSimple());
+        }
+    }
+
+    /**
+     * Bodies captured from a real grpc-go 1.84 helloworld client and server through an h2c proxy.
+     * Native gRPC carries the status in HTTP/2 trailers, so the response body has no trailer frame.
+     */
+    @Nested
+    class NativeGrpc {
+
+        /** {@code SayHello} request from grpc-go: {@code { 1: "alice" }}. */
+        private static final byte[] GRPC_GO_REQUEST =
+                HexFormat.of().parseHex("00000000070a05616c696365");
+
+        /** grpc-go's reply: {@code { 1: "Hello alice" }}. */
+        private static final byte[] GRPC_GO_RESPONSE =
+                HexFormat.of().parseHex("000000000d0a0b48656c6c6f20616c696365");
+
+        @Test
+        @DisplayName("a grpc-go request decodes as a bare message")
+        void requestDecodes() throws Exception {
+            GrpcWebDocument document = GrpcWebDocument.decode(GRPC_GO_REQUEST, GrpcWebFormat.GRPC);
+
+            assertTrue(document.isSimple());
+            assertTrue(document.toPayloadJson().contains("\"alice\""), document.toPayloadJson());
+            assertEquals(FieldType.STRING, document.typeDefinition().get(1).type());
+        }
+
+        @Test
+        @DisplayName("a grpc-go response without a trailer frame decodes")
+        void responseDecodes() throws Exception {
+            GrpcWebDocument document =
+                    GrpcWebDocument.decode(GRPC_GO_RESPONSE, GrpcWebFormat.GRPC);
+
+            assertEquals(1, document.frameCount());
+            assertTrue(document.toPayloadJson().contains("\"Hello alice\""),
+                    document.toPayloadJson());
+        }
+
+        @Test
+        @DisplayName("an untouched grpc-go body re-encodes to the original bytes")
+        void untouchedBodyRoundTrips() throws Exception {
+            GrpcWebDocument document = GrpcWebDocument.decode(GRPC_GO_REQUEST, GrpcWebFormat.GRPC);
+
+            byte[] reEncoded = GrpcWebDocument.encode(document.toPayloadJson(),
+                    document.toTypeDefinitionJson(), GrpcWebFormat.GRPC);
+            assertArrayEquals(GRPC_GO_REQUEST, reEncoded);
+        }
+
+        @Test
+        @DisplayName("an edit is framed as raw binary, not base64")
+        void editIsFramedAsBinary() throws Exception {
+            GrpcWebDocument document = GrpcWebDocument.decode(GRPC_GO_REQUEST, GrpcWebFormat.GRPC);
+
+            byte[] edited = GrpcWebDocument.encode(
+                    document.toPayloadJson().replace("alice", "mallory"),
+                    document.toTypeDefinitionJson(), GrpcWebFormat.GRPC);
+            assertArrayEquals(HexFormat.of().parseHex("00000000090a076d616c6c6f7279"), edited);
         }
     }
 }

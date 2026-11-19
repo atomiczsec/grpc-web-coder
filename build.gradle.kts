@@ -3,7 +3,13 @@ plugins {
 }
 
 group = "com.nxenon"
+<<<<<<< HEAD
 version = "2.1.1"
+||||||| 6de4546
+version = "2.0.1"
+=======
+version = "2.1.0"
+>>>>>>> origin/main
 
 repositories {
     mavenCentral()
