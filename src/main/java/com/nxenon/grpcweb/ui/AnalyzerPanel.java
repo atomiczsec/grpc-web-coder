@@ -17,6 +17,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -54,11 +55,14 @@ final class AnalyzerPanel {
         JTable endpointTable = new JTable(endpointModel);
         endpointTable.setRowSorter(new TableRowSorter<>(endpointModel));
         endpointTable.setAutoCreateRowSorter(false);
-        endpointTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        endpointTable.setFillsViewportHeight(true);
+        configureColumns(endpointTable, new int[]{180, 220, 120, 100, 110, 140, 140});
 
         JTable fieldTable = new JTable(fieldModel);
         fieldTable.setRowSorter(new TableRowSorter<>(fieldModel));
         fieldTable.setAutoCreateRowSorter(false);
+        fieldTable.setFillsViewportHeight(true);
+        configureColumns(fieldTable, new int[]{180, 160, 120, 70, 80, 160});
 
         JPanel endpointPanel = new JPanel(new BorderLayout());
         endpointPanel.setBorder(BorderFactory.createTitledBorder("Endpoints"));
@@ -70,10 +74,27 @@ final class AnalyzerPanel {
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, endpointPanel, fieldPanel);
         split.setResizeWeight(0.4);
+        split.setContinuousLayout(true);
 
         component = new JPanel(new BorderLayout());
         component.add(buildToolbar(), BorderLayout.NORTH);
         component.add(split, BorderLayout.CENTER);
+        updateExportEnabled();
+    }
+
+    /**
+     * Same resize mode and sensible widths for both tables.
+     *
+     * <p>The endpoints table used to set {@code AUTO_RESIZE_OFF} with no preferred widths while the
+     * fields table kept the default mode, so one scrolled with truncated columns and the other
+     * squashed them. Both now share last-column stretch and explicit widths.
+     */
+    private static void configureColumns(JTable table, int[] preferredWidths) {
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+        TableColumnModel columns = table.getColumnModel();
+        for (int i = 0; i < preferredWidths.length && i < columns.getColumnCount(); i++) {
+            columns.getColumn(i).setPreferredWidth(preferredWidths[i]);
+        }
     }
 
     private Component buildToolbar() {
@@ -134,6 +155,7 @@ final class AnalyzerPanel {
             int added = results.add(source, result);
             endpointModel.refresh();
             fieldModel.refresh();
+            updateExportEnabled();
             if (added == 0) {
                 setSummary("Already had every finding from " + source + ".");
                 return;
@@ -164,12 +186,18 @@ final class AnalyzerPanel {
     }
 
     private void clear() {
-        SwingUtilities.invokeLater(() -> {
-            results.clear();
-            endpointModel.refresh();
-            fieldModel.refresh();
-            setSummary("No JavaScript analyzed yet.");
-        });
+        results.clear();
+        endpointModel.refresh();
+        fieldModel.refresh();
+        updateExportEnabled();
+        setSummary("No JavaScript analyzed yet.");
+    }
+
+    private void updateExportEnabled() {
+        boolean hasResults = !results.isEmpty();
+        exportButton.setEnabled(hasResults);
+        copyButton.setEnabled(hasResults);
+        clearButton.setEnabled(hasResults);
     }
 
     private void setSummary(String message) {

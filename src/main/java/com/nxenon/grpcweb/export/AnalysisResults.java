@@ -7,6 +7,8 @@ import com.nxenon.grpcweb.analyze.JsAnalyzer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -101,12 +103,24 @@ public final class AnalysisResults {
                 .toList();
     }
 
-    /** Fields grouped by message name, each group sorted by field number. */
+    /**
+     * Fields grouped by message name, each group sorted by field number.
+     *
+     * <p>When the same message is found in several responses the results table keeps a row per
+     * source, but exports need one declaration per field number. Without collapsing those, a
+     * reconstructed {@code .proto} would repeat {@code user_name = 1;} and fail to compile.
+     */
     public Map<String, List<GrpcMessageField>> fieldsByMessage() {
         Map<String, List<GrpcMessageField>> byMessage = new TreeMap<>();
+        Map<String, Set<Integer>> seenNumbers = new HashMap<>();
         for (FieldEntry entry : fields) {
-            byMessage.computeIfAbsent(entry.field().messageName(), key -> new ArrayList<>())
-                    .add(entry.field());
+            String messageName = entry.field().messageName();
+            Set<Integer> numbers =
+                    seenNumbers.computeIfAbsent(messageName, key -> new HashSet<>());
+            if (!numbers.add(entry.field().fieldNumber())) {
+                continue;
+            }
+            byMessage.computeIfAbsent(messageName, key -> new ArrayList<>()).add(entry.field());
         }
         byMessage.values().forEach(list ->
                 list.sort(Comparator.comparingInt(GrpcMessageField::fieldNumber)));

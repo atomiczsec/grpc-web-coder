@@ -12,6 +12,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -32,7 +33,8 @@ final class SettingsPanel {
     SettingsPanel(ExtensionSettings settings, AnalyzerPanel analyzerPanel) {
         JPanel settingsColumn = new JPanel();
         settingsColumn.setLayout(new BoxLayout(settingsColumn, BoxLayout.Y_AXIS));
-        settingsColumn.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        settingsColumn.setBorder(BorderFactory.createEmptyBorder(10, 10, 6, 10));
+        settingsColumn.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         settingsColumn.add(heading("Body format detection"));
         settingsColumn.add(note(
@@ -62,10 +64,10 @@ final class SettingsPanel {
         forceProto.addActionListener(
                 event -> settings.setDetectionMode(DetectionMode.FORCE_PROTO));
 
-        settingsColumn.add(automatic);
-        settingsColumn.add(forceText);
-        settingsColumn.add(forceProto);
-        settingsColumn.add(Box.createVerticalStrut(14));
+        settingsColumn.add(align(automatic));
+        settingsColumn.add(align(forceText));
+        settingsColumn.add(align(forceProto));
+        settingsColumn.add(Box.createVerticalStrut(12));
 
         settingsColumn.add(heading("Where the tab appears"));
 
@@ -77,7 +79,7 @@ final class SettingsPanel {
                         + " grpc-web-text unless a format is forced above.");
         showTabAlways.addActionListener(
                 event -> settings.setShowTabAlways(showTabAlways.isSelected()));
-        settingsColumn.add(showTabAlways);
+        settingsColumn.add(align(showTabAlways));
 
         JCheckBox decodeResponses = new JCheckBox(
                 "Decode responses as well as requests", settings.decodeResponses());
@@ -85,27 +87,36 @@ final class SettingsPanel {
                 "Server-streaming responses carry several frames plus a trailer frame.");
         decodeResponses.addActionListener(
                 event -> settings.setDecodeResponses(decodeResponses.isSelected()));
-        settingsColumn.add(decodeResponses);
-        settingsColumn.add(Box.createVerticalStrut(14));
+        settingsColumn.add(align(decodeResponses));
+        settingsColumn.add(Box.createVerticalStrut(12));
 
         settingsColumn.add(heading("Analyzing JavaScript"));
         settingsColumn.add(note(
-                "Right-click a response in the proxy history or site map and choose"
-                        + " \"Analyze gRPC-Web Endpoints\" to pull service routes and message"
-                        + " fields out of a gRPC-Web bundle. Results appear below."));
+                "Right-click a response and choose \"Analyze gRPC-Web Endpoints\"."
+                        + " Results appear below."));
 
-        JPanel settingsWrapper = new JPanel(new BorderLayout());
-        settingsWrapper.add(settingsColumn, BorderLayout.NORTH);
+        // A split keeps the settings from eating the results tables, and keeps the tables from
+        // vanishing when the window is short. The previous layout put a JScrollPane in
+        // BorderLayout.NORTH, which took its preferred height and crushed the analyzer.
+        JScrollPane settingsScroll = new JScrollPane(settingsColumn);
+        settingsScroll.setBorder(BorderFactory.createEmptyBorder());
+        settingsScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+        JSplitPane split = new JSplitPane(
+                JSplitPane.VERTICAL_SPLIT, settingsScroll, analyzerPanel.uiComponent());
+        split.setResizeWeight(0.0);
+        split.setDividerLocation(260);
+        split.setContinuousLayout(true);
 
         component = new JPanel(new BorderLayout());
-        component.add(new JScrollPane(settingsWrapper), BorderLayout.NORTH);
-        component.add(analyzerPanel.uiComponent(), BorderLayout.CENTER);
+        component.add(split, BorderLayout.CENTER);
     }
 
     private static JLabel heading(String text) {
         JLabel label = new JLabel(text);
         label.setFont(label.getFont().deriveFont(Font.BOLD));
         label.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
     }
 
@@ -128,9 +139,16 @@ final class SettingsPanel {
         // A JTextArea defaults to a monospaced font; match the surrounding labels instead.
         area.setFont(new JLabel().getFont());
         area.setAlignmentX(Component.LEFT_ALIGNMENT);
-        // BoxLayout would otherwise stretch the area to its maximum height.
-        area.setMaximumSize(new Dimension(640, Integer.MAX_VALUE));
+        // Stretch with the column width so the note does not sit as a narrow strip beside full-width
+        // radio buttons, but cap height so BoxLayout does not grow it endlessly.
+        area.setMaximumSize(new Dimension(Integer.MAX_VALUE, area.getPreferredSize().height + 6));
         return area;
+    }
+
+    /** Keeps BoxLayout from centering buttons that default to a different alignment X. */
+    private static JComponent align(JComponent component) {
+        component.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return component;
     }
 
     Component uiComponent() {

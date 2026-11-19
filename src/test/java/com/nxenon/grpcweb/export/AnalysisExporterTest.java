@@ -440,6 +440,29 @@ class AnalysisExporterTest {
         }
 
         @Test
+        @DisplayName("fields from two sources collapse by number so a .proto stays valid")
+        void fieldsByMessageCollapsesDuplicatesAcrossSources() throws IOException {
+            JsAnalyzer.Result analysis = JsAnalyzer.analyze(
+                    Files.readString(Path.of("samples", "auth_grpc_web_pb.js")));
+
+            AnalysisResults accumulated = new AnalysisResults();
+            accumulated.add("bundle-a.js", analysis);
+            accumulated.add("bundle-b.js", analysis);
+
+            // The table keeps a row per source (32 field rows), but each message's field numbers
+            // appear once in the export grouping.
+            assertEquals(32, accumulated.fieldCount());
+            int uniqueFields = accumulated.fieldsByMessage().values().stream()
+                    .mapToInt(List::size)
+                    .sum();
+            assertEquals(16, uniqueFields);
+
+            String proto = AnalysisExporter.export(accumulated, AnalysisExporter.Format.PROTO);
+            assertEquals(1, proto.lines().filter(line -> line.contains("user_name = 1;")).count(),
+                    "duplicate field numbers across sources must not repeat in the .proto");
+        }
+
+        @Test
         @DisplayName("clearing empties the model")
         void clearEmptiesEverything() throws IOException {
             AnalysisResults accumulated = new AnalysisResults();

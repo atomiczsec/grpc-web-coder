@@ -4,7 +4,6 @@ import burp.api.montoya.ui.editor.Editor;
 
 import java.awt.Component;
 import java.awt.Container;
-import javax.swing.JTextArea;
 import javax.swing.text.JTextComponent;
 
 /**
@@ -56,7 +55,8 @@ final class BurpEditorComponents {
     }
 
     private static Component findTextComponent(Component component) {
-        if (component instanceof JTextArea || component instanceof JTextComponent) {
+        // JTextArea is a JTextComponent; one check covers Burp's syntax area and plain editors.
+        if (component instanceof JTextComponent) {
             return component;
         }
         if (component instanceof Container container) {
