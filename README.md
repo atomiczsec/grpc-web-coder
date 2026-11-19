@@ -1,6 +1,6 @@
 # gRPC-Web Coder
 
-Burp Suite extension that encodes and decodes gRPC-Web payloads without the target's `.proto`
+Burp Suite extension that encodes and decodes gRPC-Web and native gRPC payloads without the target's `.proto`
 schema, and maps a target's gRPC services from its JavaScript. Built on the Montoya API.
 
 - **BApp Store:** [gRPC-Web Coder](https://portswigger.net/bappstore/63b92be302fa4521bf18d74b3adbbc00)
@@ -9,6 +9,10 @@ Supported content types:
 
 - `application/grpc-web-text`, `application/grpc-web-text+proto`
 - `application/grpc-web+proto`, `application/grpc-web`
+- `application/grpc`, `application/grpc+proto` — native gRPC over HTTP/2, as sent by
+  [grpc-go](https://github.com/grpc/grpc-go) and the other core gRPC implementations. The body uses
+  the same length-prefixed frames as `application/grpc-web+proto`; the status arrives in HTTP/2
+  trailers, which Burp shows as headers, so the body holds only data frames.
 
 > This repository previously held the Python gRPC-Pentest-Suite tools. They are still available —
 > see [Older Python tools](#older-python-tools) at the end.

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -292,6 +293,47 @@ class EditorIntegrationTest {
 
             // The payload still decodes with the detected definition.
             assertTrue(payloadEditor().text().contains("amin"), payloadEditor().text());
+        }
+    }
+
+    /** Native gRPC, using a request body captured from a real grpc-go client. */
+    @Nested
+    class NativeGrpc {
+
+        private static final String GRPC = "application/grpc";
+
+        /** grpc-go {@code SayHello} request: one data frame holding {@code { 1: "alice" }}. */
+        private static final String GRPC_GO_REQUEST =
+                new String(HexFormat.of().parseHex("00000000070a05616c696365"),
+                        StandardCharsets.US_ASCII);
+
+        @Test
+        @DisplayName("the tab appears for application/grpc and application/grpc+proto")
+        void tabAppears() {
+            GrpcWebRequestEditor editor = requestEditor();
+            assertTrue(editor.isEnabledFor(BurpTestHarness.requestWith(GRPC, GRPC_GO_REQUEST)));
+            assertTrue(editor.isEnabledFor(
+                    BurpTestHarness.requestWith("application/grpc+proto", GRPC_GO_REQUEST)));
+        }
+
+        @Test
+        @DisplayName("the request payload is decoded")
+        void requestDecodes() {
+            requestEditor().setRequestResponse(BurpTestHarness.requestWith(GRPC, GRPC_GO_REQUEST));
+
+            assertTrue(payloadEditor().text().contains("\"alice\""), payloadEditor().text());
+        }
+
+        @Test
+        @DisplayName("an edit is re-encoded as a binary gRPC frame")
+        void editReachesTheBody() {
+            GrpcWebRequestEditor editor = requestEditor();
+            editor.setRequestResponse(BurpTestHarness.requestWith(GRPC, GRPC_GO_REQUEST));
+
+            payloadEditor().type(payloadEditor().text().replace("alice", "mallory"));
+
+            assertEquals("00000000090a076d616c6c6f7279",
+                    HexFormat.of().formatHex(editor.getRequest().body().getBytes()));
         }
     }
 

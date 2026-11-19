@@ -7,8 +7,8 @@ import com.nxenon.grpcweb.ui.GrpcWebCoderUi;
 /**
  * Entry point for the gRPC-Web Coder extension.
  *
- * <p>Encodes and decodes {@code application/grpc-web-text} and {@code application/grpc-web+proto}
- * bodies without needing the {@code .proto} schema, and pulls service routes and message fields out
+ * <p>Encodes and decodes {@code application/grpc-web-text}, {@code application/grpc-web+proto} and
+ * native {@code application/grpc} bodies without needing the {@code .proto} schema, and pulls service routes and message fields out
  * of generated gRPC-Web JavaScript.
  *
  * <p>Everything is registered through the Montoya API, and every registration is released by the
@@ -27,7 +27,8 @@ public final class GrpcWebCoderExtension implements BurpExtension {
 
         api.logging().logToOutput(NAME + " loaded.");
         api.logging().logToOutput(
-                "Decodes application/grpc-web-text and application/grpc-web+proto bodies in the"
+                "Decodes application/grpc-web-text, application/grpc-web+proto and native"
+                        + " application/grpc bodies in the"
                         + " message editor. Right-click a JavaScript response and choose"
                         + " \"Analyze gRPC-Web Endpoints\" to map a target's services.");
     }
