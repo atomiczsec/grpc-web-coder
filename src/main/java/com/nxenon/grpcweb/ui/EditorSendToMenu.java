@@ -10,9 +10,12 @@ import burp.api.montoya.ui.editor.RawEditor;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import java.awt.Component;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Supplier;
 
@@ -35,16 +38,28 @@ final class EditorSendToMenu extends MouseAdapter {
     private final Supplier<HttpRequest> requestSupplier;
     private final Supplier<HttpResponse> responseSupplier;
     private final Supplier<ByteArray> selectionSupplier;
+    private final Supplier<Clipboard> clipboardSupplier;
 
     EditorSendToMenu(
             MontoyaApi api,
             Supplier<HttpRequest> requestSupplier,
             Supplier<HttpResponse> responseSupplier,
             Supplier<ByteArray> selectionSupplier) {
+        this(api, requestSupplier, responseSupplier, selectionSupplier,
+                () -> Toolkit.getDefaultToolkit().getSystemClipboard());
+    }
+
+    EditorSendToMenu(
+            MontoyaApi api,
+            Supplier<HttpRequest> requestSupplier,
+            Supplier<HttpResponse> responseSupplier,
+            Supplier<ByteArray> selectionSupplier,
+            Supplier<Clipboard> clipboardSupplier) {
         this.api = api;
         this.requestSupplier = requestSupplier;
         this.responseSupplier = responseSupplier;
         this.selectionSupplier = selectionSupplier;
+        this.clipboardSupplier = clipboardSupplier;
     }
 
     /** Attaches this menu to the editable surface of a Burp raw editor. */
@@ -105,9 +120,10 @@ final class EditorSendToMenu extends MouseAdapter {
                 menu.addSeparator();
             }
             if (selection != null && selection.length() > 0) {
-                menu.add(item("Copy", () -> copy(selection)));
+                menu.add(item("Copy", () -> copy(selection, StandardCharsets.UTF_8)));
             } else if (request != null) {
-                menu.add(item("Copy request", () -> copy(request.toByteArray())));
+                menu.add(item("Copy request",
+                        () -> copy(request.toByteArray(), StandardCharsets.ISO_8859_1)));
             }
         }
 
@@ -128,11 +144,17 @@ final class EditorSendToMenu extends MouseAdapter {
         return null;
     }
 
-    private void copy(ByteArray data) {
-        String text = new String(data.getBytes(), StandardCharsets.UTF_8);
-        java.awt.Toolkit.getDefaultToolkit()
-                .getSystemClipboard()
-                .setContents(new StringSelection(text), null);
+    /**
+     * Puts bytes on the text clipboard.
+     *
+     * <p>A selection comes from the decoded payload, which is UTF-8 JSON. A whole request is raw
+     * HTTP whose body may be binary gRPC frames, so it is copied as ISO-8859-1: every byte maps to
+     * exactly one character, and pasting it back yields the original bytes. UTF-8 would replace
+     * each invalid byte with U+FFFD.
+     */
+    private void copy(ByteArray data, Charset charset) {
+        String text = new String(data.getBytes(), charset);
+        clipboardSupplier.get().setContents(new StringSelection(text), null);
     }
 
     private static JMenuItem item(String label, Runnable action) {
