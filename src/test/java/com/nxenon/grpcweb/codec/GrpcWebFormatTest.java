@@ -13,12 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class GrpcWebFormatTest {
 
     @ParameterizedTest
-    @DisplayName("gRPC-Web content types resolve to the right body encoding")
+    @DisplayName("gRPC-Web and native gRPC content types resolve to the right body encoding")
     @CsvSource({
             "application/grpc-web-text,TEXT",
             "application/grpc-web-text+proto,TEXT",
             "application/grpc-web+proto,PROTO",
             "application/grpc-web,PROTO",
+            "application/grpc,GRPC",
+            "application/grpc+proto,GRPC",
+            "Application/gRPC; charset=utf-8,GRPC",
     })
     void contentTypesResolve(String contentType, GrpcWebFormat expected) {
         assertSame(expected, GrpcWebFormat.fromContentType(contentType));
@@ -47,10 +50,11 @@ class GrpcWebFormatTest {
     }
 
     @ParameterizedTest
-    @DisplayName("non-gRPC-Web content types are not claimed")
+    @DisplayName("non-gRPC and non-protobuf gRPC content types are not claimed")
     @ValueSource(strings = {
             "application/json",
-            "application/grpc",
+            "application/grpc+json",
+            "application/grpcx",
             "application/x-protobuf",
             "text/plain",
             "application/grpc-web-textual",
