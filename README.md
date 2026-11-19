@@ -15,6 +15,7 @@ Supported content types:
 
 ## Contents
 
+- [Download](#download)
 - [Build](#build)
 - [Install in Burp](#install-in-burp)
 - [Test it locally](#test-it-locally)
@@ -24,6 +25,14 @@ Supported content types:
 - [Tests](#tests)
 - [Older Python tools](#older-python-tools)
 - [Articles, video and lab](#articles-video-and-lab)
+
+## Download
+
+Every version is built by CI and published on the
+[Releases page](https://github.com/atomiczsec/grpc-web-coder/releases/latest): download
+`grpc-web-coder-all.jar` and [install it in Burp](#install-in-burp). Merging a new `version` in
+`build.gradle.kts` to `main` publishes the next release; every other build's jar is attached to its
+[workflow run](https://github.com/atomiczsec/grpc-web-coder/actions/workflows/build.yml).
 
 ## Build
 
@@ -47,7 +56,7 @@ inside it.
 
 1. **Extensions** → **Installed** → **Add**
 2. Extension type: **Java**
-3. Select `build/libs/grpc-web-coder-all.jar`
+3. Select `grpc-web-coder-all.jar` (downloaded, or `build/libs/grpc-web-coder-all.jar` if you built it)
 4. Click **Next**
 
 The **Output** tab should show `gRPC-Web Coder loaded.` and a **gRPC-Web Coder** tab appears in
