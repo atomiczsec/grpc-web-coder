@@ -10,33 +10,11 @@ Supported content types:
 - `application/grpc-web-text`, `application/grpc-web-text+proto`
 - `application/grpc-web+proto`, `application/grpc-web`
 - `application/grpc`, `application/grpc+proto` — native gRPC over HTTP/2, as sent by
-  [grpc-go](https://github.com/grpc/grpc-go) and the other core gRPC implementations. The body uses
-  the same length-prefixed frames as `application/grpc-web+proto`; the status arrives in HTTP/2
-  trailers, which Burp shows as headers, so the body holds only data frames.
+  [grpc-go](https://github.com/grpc/grpc-go) and the other core gRPC implementations.
 
 > This repository previously held the Python gRPC-Pentest-Suite tools. They are still available —
 > see [Older Python tools](#older-python-tools) at the end.
 
-## Contents
-
-- [Download](#download)
-- [Build](#build)
-- [Install in Burp](#install-in-burp)
-- [Test it locally](#test-it-locally)
-- [How the tabs work](#how-the-tabs-work)
-- [Analyzing JavaScript](#analyzing-javascript)
-- [Design notes](#design-notes)
-- [Tests](#tests)
-- [Older Python tools](#older-python-tools)
-- [Articles, video and lab](#articles-video-and-lab)
-
-## Download
-
-Every version is built by CI and published on the
-[Releases page](https://github.com/atomiczsec/grpc-web-coder/releases/latest): download
-`grpc-web-coder-all.jar` and [install it in Burp](#install-in-burp). Merging a new `version` in
-`build.gradle.kts` to `main` publishes the next release; every other build's jar is attached to its
-[workflow run](https://github.com/atomiczsec/grpc-web-coder/actions/workflows/build.yml).
 
 ## Build
 
