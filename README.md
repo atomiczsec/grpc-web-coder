@@ -1,7 +1,7 @@
 # gRPC-Web Coder
 
-Burp Suite extension that encodes and decodes gRPC-Web and native gRPC payloads without the target's `.proto`
-schema, and maps a target's gRPC services from its JavaScript. Built on the Montoya API.
+Burp Suite extension that encodes and decodes gRPC-Web and native gRPC payloads without the
+target's `.proto` schema, and maps a target's gRPC services from its JavaScript. Built on the Montoya API.
 
 - **BApp Store:** [gRPC-Web Coder](https://portswigger.net/bappstore/63b92be302fa4521bf18d74b3adbbc00)
 
@@ -15,6 +15,17 @@ Supported content types:
 > This repository previously held the Python gRPC-Pentest-Suite tools. They are still available —
 > see [Older Python tools](#older-python-tools) at the end.
 
+## Contents
+
+- [Build](#build)
+- [Install in Burp](#install-in-burp)
+- [Test it locally](#test-it-locally)
+- [How the tabs work](#how-the-tabs-work)
+- [Analyzing JavaScript](#analyzing-javascript)
+- [Design notes](#design-notes)
+- [Tests](#tests)
+- [Older Python tools](#older-python-tools)
+- [Articles, video and lab](#articles-video-and-lab)
 
 ## Build
 
@@ -38,7 +49,7 @@ inside it.
 
 1. **Extensions** → **Installed** → **Add**
 2. Extension type: **Java**
-3. Select `grpc-web-coder-all.jar` (downloaded, or `build/libs/grpc-web-coder-all.jar` if you built it)
+3. Select `build/libs/grpc-web-coder-all.jar`
 4. Click **Next**
 
 The **Output** tab should show `gRPC-Web Coder loaded.` and a **gRPC-Web Coder** tab appears in
