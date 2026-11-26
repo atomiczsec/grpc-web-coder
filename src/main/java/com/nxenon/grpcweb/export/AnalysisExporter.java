@@ -7,6 +7,7 @@ import com.nxenon.grpcweb.analyze.GrpcEndpoint;
 import com.nxenon.grpcweb.analyze.GrpcMessageField;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -448,4 +449,17 @@ public final class AnalysisExporter {
         };
     }
 
+    /** Groups results by message for callers that want per-message type definitions. */
+    static Map<String, String> typeDefinitionsByMessage(AnalysisResults results) {
+        Map<String, String> byMessage = new LinkedHashMap<>();
+        com.google.gson.JsonObject all =
+                com.google.gson.JsonParser.parseString(toTypeDefinitions(results))
+                        .getAsJsonObject();
+        com.google.gson.Gson pretty =
+                new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        for (String message : all.keySet()) {
+            byMessage.put(message, pretty.toJson(all.get(message)));
+        }
+        return byMessage;
+    }
 }
